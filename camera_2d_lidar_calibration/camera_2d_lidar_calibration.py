@@ -2,7 +2,7 @@ import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 import rosbag2_py
-from sensor_msgs.msg import Image, LaserScan
+from sensor_msgs.msg import Image, PointCloud
 import os
 from rclpy.serialization import deserialize_message
 import cv2
@@ -10,7 +10,6 @@ import cv_bridge
 import tkinter as tk
 from tkinter import ttk
 from pathlib import Path
-import sensor_msgs_py.point_cloud2 as pc2
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.backends.backend_tkagg as tkagg 
@@ -18,16 +17,15 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn import linear_model
 from datetime import datetime
-import laser_geometry
 home = Path.home()
 
 
 class ImageAndScans:
-    def __init__(self, image:np.ndarray, scans:list[LaserScan], bag_name:str):
+    def __init__(self, image:np.ndarray, scans:list[PointCloud], bag_name:str):
         assert isinstance(image, np.ndarray), "Error: image must be of the form np.ndarray"
         assert isinstance(scans , list), "Error: scans must be a list."
         for scan in scans:
-            assert isinstance(scan, LaserScan), "Error: scans must contain LaserScan objects."
+            assert isinstance(scan, PointCloud), "Error: scans must contain PointCloud objects."
         self.bag_name_ = bag_name
         self.image_ = image
         self.scans_ = scans
@@ -45,12 +43,29 @@ class ImageAndScans:
 
     def concatenate_scans_to_points(self, indices=[0]) -> np.ndarray:
         scans = self.get_scans()
-        laser_projection = laser_geometry.LaserProjection()
-        selected_scans = [laser_projection.projectLaser(scans[i]) for i in indices]
-        
-        scans_numpy = [pc2.read_points(scan) for scan in selected_scans]
-        concatenated_scans = np.concatenate(scans_numpy)
-        return concatenated_scans # x,y,z,intensity,index
+        selected_scans = [scans[i] for i in indices]
+
+        scan_arrays = []
+        for scan in selected_scans:
+            points_list = []
+            # Attempt to pull intensity from channels if present; otherwise default to 0.0
+            channels_by_name = {ch.name: ch.values for ch in scan.channels} if scan.channels else {}
+            intensity_values = channels_by_name.get("intensity", None)
+
+            for idx, pt in enumerate(scan.points):
+                intensity = 0.0
+                if intensity_values is not None and idx < len(intensity_values):
+                    intensity = intensity_values[idx]
+                points_list.append([pt.x, pt.y, pt.z, intensity, idx])
+
+            if points_list:
+                scan_arrays.append(np.array(points_list, dtype=np.float32))
+
+        if not scan_arrays:
+            return np.empty((0, 5), dtype=np.float32)
+
+        concatenated_scans = np.concatenate(scan_arrays, axis=0)
+        return concatenated_scans  # x,y,z,intensity,index
     
     def set_undistorted_image(self, undistorted_image:np.ndarray):
         self.undistorted_image_ = undistorted_image.copy()
@@ -70,7 +85,8 @@ class ImageAndScans:
 
     def get_image(self) -> np.ndarray:
         return self.image_.copy()
-    def get_scans(self) -> list[LaserScan]:
+
+    def get_scans(self) -> list[PointCloud]:
         return self.scans_.copy()
     
     def has_undistored_image(self) -> bool:
@@ -330,16 +346,15 @@ class SelectPointsInterface:
         self.figure.canvas.draw()
         self.figure.canvas.flush_events()
 
+
     def scan_slider_callback(self,event):
         if self.scan_end_slider.get() < self.scan_start_slider.get():
             self.scan_end_slider.set(self.scan_start_slider.get())
 
         self.scan_indices = np.arange(self.scan_start_slider.get(),self.scan_end_slider.get()+1)
-        
         self.reset_and_add_2d_lidar_points()
 
     
-
     def select_points(self, event):
         self.clear_selected_2d_lidar_points()
 
@@ -351,12 +366,12 @@ class SelectPointsInterface:
         self.selected_points_indices = list(np.logical_and(selected_x_indices, selected_y_indices))
         points_xy_selected = points_xy[np.array(self.selected_points_indices)]
 
-
         self.ax_selected_lidar_points = self.ax.scatter(points_xy_selected[:,0], points_xy_selected[:,1], c='red')
 
         self.figure.canvas.draw()
         self.figure.canvas.flush_events()
     
+
     def done_callback(self, event):
         if self.selected_points_indices:
             pc2_points = self.image_and_scans.concatenate_scans_to_points(self.scan_indices)
@@ -364,11 +379,14 @@ class SelectPointsInterface:
             self.image_and_scans.set_selected_lidar_points(selected_pc2_points)
             self.root.destroy()
 
+
     def on_xlims_change(self, event_ax):
         self.xlims = event_ax.get_xlim()
 
+
     def on_ylims_change(self, event_ax):
         self.ylims = event_ax.get_ylim()
+
 
     def add_figure(self):
         
@@ -384,27 +402,33 @@ class SelectPointsInterface:
         # self.ax.set_axis_off()
         pass
 
+
     def clear_selected_2d_lidar_points(self):
         if self.ax_selected_lidar_points:
             self.ax_selected_lidar_points.remove()
         self.ax_selected_lidar_points = None
         self.selected_points_indices = None
 
+
     def clear_2d_lidar_points(self):
         if self.ax_lidar_points:
             self.ax_lidar_points.remove()
         self.ax_lidar_points = None
     
+
     def add_2d_lidar_points(self, points:np.ndarray):
-        assert isinstance(points, np.ndarray), "Error: points must be a numpy array."
-        points_xy = np.array([[point[0], point[1]] for point in points])
-        self.ax_lidar_points = self.ax.scatter(points_xy[:,0], points_xy[:,1], c='blue')
+        if points is not None:
+            assert isinstance(points, np.ndarray), "Error: points must be a numpy array."
+            points_xy = np.array([[point[0], point[1]] for point in points])
+            self.ax_lidar_points = self.ax.scatter(points_xy[:,0], points_xy[:,1], c='blue')
+
 
     def run(self) -> ImageAndScans:
         self.app.mainloop()
         assert self.image_and_scans.has_selected_points(), "Error: You must select 2D LiDAR points to proceed."
         return self.image_and_scans
     
+
 class CameraParameters:
     def __init__(self, camera_intrinsic_matrix, k1,k2,p1,p2,k3):
         assert isinstance(camera_intrinsic_matrix, np.ndarray), "Error: camera_intrinsic_matrix must be a matrix."
@@ -415,6 +439,7 @@ class CameraParameters:
     def get_camera_parameters(self) -> tuple[np.ndarray, list]:
         return (self.camera_intrinsic_matrix.copy(), self.distortion_coeffs.copy())
    
+
 class ChessboardParameters:
     def __init__(self, chessboard_square_size, chessboard_inner_width, chessboard_inner_height):
         self.chessboard_square_size = chessboard_square_size
@@ -426,7 +451,6 @@ class ChessboardParameters:
     
 
 class BagToImageAndScans(Node):
-
     def __init__(self):
         super().__init__('camera_2d_lidar_calibration')
         
@@ -444,8 +468,7 @@ class BagToImageAndScans(Node):
         self.declare_parameter("chessboard_inner_height", 8)
 
         self.declare_parameter("image_topic", "/camera/image_raw")
-        self.declare_parameter("scan_topic", "/scan")
-
+        self.declare_parameter("scan_topic", "/pointcloud2d")
 
         # Retrieve parameters
         camera_intrinsic_matrix = self.get_parameter("camera_intrinsic_matrix").value
@@ -467,23 +490,24 @@ class BagToImageAndScans(Node):
         self.image_and_scan_list = []
 
         self.image_publisher = self.create_publisher(Image, '/image', 10) # publisher for real-time image monitoring if necessary
-        self.lidar_publisher = self.create_publisher(LaserScan, '/scan', 10) # publisher for real-time lidar monitoring if necessary
+        self.lidar_publisher = self.create_publisher(PointCloud, '/pointcloud2d', 10) # publisher for real-time lidar monitoring if necessary
 
-        bags_location = f'{home}/ros2_ws/src/camera_2d_lidar_calibration/bags/'
-
-        self.bags = os.listdir(bags_location)
+        bags_location = f'{home}/Downloads/'
+        # self.bags = os.listdir(bags_location)
+        self.bags = ['rosbag2_2026_cameracaliberation/']
         
         for bag_file_name in self.bags:
             self.get_logger().info('Processing ' + bag_file_name + 'bag file.')
             self.reader = rosbag2_py.SequentialReader()
             storage_options = rosbag2_py.StorageOptions(
                 uri=f"{bags_location}{bag_file_name}/",
-                storage_id='sqlite3')
+                storage_id='mcap')
 
             converter_options = rosbag2_py.ConverterOptions('', '')
             self.reader.open(storage_options, converter_options)
 
             self.image_and_scan_list.append(self.extract_image_and_scans(bag_file_name))
+
 
     def extract_image_and_scans(self,bag_file_name) -> ImageAndScans:
         selected_image = False
@@ -503,9 +527,9 @@ class BagToImageAndScans(Node):
                 self.get_logger().info(f'Published serialized data to /image')
             
             if msg[0] == self.scan_topic:
-                decoded_data = deserialize_message(msg[1], LaserScan) # get serialized version of message and decode it
-                self.lidar_publisher.publish(msg[1])
+                decoded_data = deserialize_message(msg[1], PointCloud) # get serialized version of message and decode it
                 scans.append(decoded_data)      
+                self.lidar_publisher.publish(msg[1])
         return ImageAndScans(image, scans, bag_file_name)
 
     def get_camera_params(self) -> CameraParameters:
@@ -547,6 +571,7 @@ def get_vertical_and_horizontal_lines(img:np.ndarray) -> tuple[np.ndarray, np.nd
                 horizontal_lines.append([(l[0], l[1]), (l[2], l[3])])
     return (cdstP, np.array(vertical_lines), np.array(horizontal_lines))
 
+
 def get_detected_chessboard(img:np.ndarray, camera_params:CameraParameters, chessboard_params:ChessboardParameters):
     """
     Uses real-world properties of chessboard to define a chessboard frame where Z points perpendicular from the chessboard towards camera, X points width-wise and Y points height-wise.
@@ -570,7 +595,6 @@ def get_detected_chessboard(img:np.ndarray, camera_params:CameraParameters, ches
     # Arrays to store object points and image points from all the images
     # objp = []  # 3D point in real world space
     corners2 = []  # 2D points in image plane
-
 
     # Find chessboard corners
     ret, corners = cv2.findChessboardCorners(gray, chessboard_size, None)
@@ -598,6 +622,7 @@ def get_detected_chessboard(img:np.ndarray, camera_params:CameraParameters, ches
         return corners2.reshape(len(corners2),-1), objp, extrinsic_matrix
     else:
         return corners2, objp, extrinsic_matrix
+
 
 def chessboard_pixels_to_camera_frame(image_points, camera_params:CameraParameters, extrinsic_matrix):
     """
@@ -633,6 +658,7 @@ def undistort_image(img:np.ndarray, camera_params:CameraParameters):
     return undistorted_image
     # cv2.imshow("undistorted", undistorted_image)
 
+
 def compute_ray_plane_intersection(ray_origin, ray, point_on_plane, basis_v1, basis_v2):
     ray_origin = ray_origin.reshape(3,1)
     ray = ray.reshape(3,1)
@@ -644,6 +670,7 @@ def compute_ray_plane_intersection(ray_origin, ray, point_on_plane, basis_v1, ba
     coeffs = np.linalg.inv(ray_trace_matrix) @ origin_difference
     projected_ray = coeffs[0] * ray + ray_origin
     return projected_ray.reshape(3)
+
 
 def first_principal_component(points:np.ndarray):
     """
@@ -657,6 +684,7 @@ def first_principal_component(points:np.ndarray):
     std_first_component = S[0]
 
     return (mean, first_component, std_first_component)
+
 
 def ransac(points:np.ndarray, plotting=True, ransac_plot_title='RANSAC Regression', ransac_window_title='RANSAC Regression'):
     """
@@ -687,7 +715,6 @@ def ransac(points:np.ndarray, plotting=True, ransac_plot_title='RANSAC Regressio
     reconstructed_line[:, smallest_range_axis] = line_y_ransac
 
     # Compare estimated coefficients
-
     if plotting:
         plt.figure()
         man = plt.get_current_fig_manager()
@@ -719,6 +746,7 @@ def ransac(points:np.ndarray, plotting=True, ransac_plot_title='RANSAC Regressio
 def get_line_end_points(points_on_line) -> tuple[np.ndarray, np.ndarray]:
     mean, first_component, std_first_component = first_principal_component(points_on_line)
     return (mean-std_first_component*first_component, mean+std_first_component*first_component)
+
 
 def save_camera_lidar_calibration_results(image_and_scan_list:list[ImageAndScans], transformation, scaling_factor):
     """Save camera 2d lidar calibration results"""
@@ -798,7 +826,6 @@ def camera_lidar_calibration(camera_params:CameraParameters, chessboard_params:C
         if angle1 < angle2:
             lidar_wall_left, lidar_wall_right = lidar_wall_right, lidar_wall_left
         
-
         fig = plt.figure()
         man = plt.get_current_fig_manager()
         man.set_window_title(f"Detected 2D LiDAR Wall - Bag: {image_and_scan.get_bag_name()}")
@@ -815,7 +842,6 @@ def camera_lidar_calibration(camera_params:CameraParameters, chessboard_params:C
             plt.show(block=False)
             plt.pause(0.01)
         # cv2.waitKey()
-
 
         fig = plt.figure()
         man = plt.get_current_fig_manager()
@@ -858,7 +884,6 @@ def camera_lidar_calibration(camera_params:CameraParameters, chessboard_params:C
 
     rigid_transformation, scale = cv2.estimateAffine3D(wall_edge_camera_frame_points, wall_edge_lidar_points, force_rotation=True)
     transformation = np.vstack([rigid_transformation, np.array([0,0,0,1])])
-
 
     # test projection of points from camera frame into lidar frame for last bag
 
@@ -912,7 +937,6 @@ def camera_lidar_calibration(camera_params:CameraParameters, chessboard_params:C
     ax.set_xlabel('x')
     ax.set_ylabel('y')
     ax.set_title('Detected 2D LiDAR Wall - Reprojection Transformed Test Points')
-    
 
     save_camera_lidar_calibration_results(image_and_scan_list, transformation, scale)
 

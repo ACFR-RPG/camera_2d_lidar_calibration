@@ -55,6 +55,7 @@ def load_clouds_from_folder(folder):
     return clouds
 
 def draw(img, corners, imgpts):
+    # Draw a 3D axis at the OpenCV origin of a checkerboard, for introspection
     corner = tuple(corners[0].ravel().astype("int32"))
     imgpts = imgpts.astype("int32")
     img = cv2.line(img, corner, tuple(imgpts[0].ravel()), (0,0,255), 2)
@@ -80,6 +81,7 @@ def main():
   assert len(images) == len(lasers), "Images and lasers length mismatch!"
 
   # Camera intrinsics, from camera calibration process
+  # TODO: Change this into the camera intrinsic calibration results
   camera_k = np.array([(519.26845842, 0.0, 331.11197675), (0.0, 518.89359517, 229.43433605), (0.0, 0.0, 1.0)])
   camera_dist = np.array([(0.11418155, 0.19343114, -0.00268067, 0.00371577, -1.09539701)])
 
@@ -87,36 +89,39 @@ def main():
   criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
   # Checkerboard shape, example: 7*10 in checkerboard blocks, 20 mm in checkerboard block size
+  # TODO: Change the checkerboard parameters into those that match with the actual board you are using
   checkerboard_height = 7
   checkerboard_width = 10 
   checkerboard_size = 0.02
   checkerboard_points = np.zeros((checkerboard_width*checkerboard_height, 3), np.float32)
   checkerboard_points[:,:2] = np.mgrid[0:checkerboard_height,0:checkerboard_width].T.reshape(-1,2)*checkerboard_size
 
-  # A predefined 3D axis for visualisation, axis length 3 cm
+  # A predefined 3D axis for visualisation, axis length 10 cm
   axis = np.float32([[0.1,0,0], [0,0.1,0], [0,0,0.1]]).reshape(-1,3)
 
   # Collected/extracted camera and LiDAR points in 2D - supposed to be aligned with each other
   camera_points = []
   laser_points = []
 
-  # Now knowing that images and lasers of the same length, loop through them at the same time
-  # to extract the corresponding points for alignment
+  # Now knowing that list 'images' and 'lasers' are of the same length, loop through them at the same time
+  # to extract the corresponding 2D line points for alignment
   for i, (this_image, this_laser) in enumerate(zip(images, lasers)):
     # print(i) 
   
-    # Extract the checkerboard from the image 
+    # Extract the checkerboard from the image and extract a line that represent the checkerboard in 2D
     # But first! Undistortion - without undistortion, the projection of linear structure into the 3D space will be distorted too
+    # Distortion effect means that a straight line in 3D is not a straight line in the camera view
+    # The attempt to extract a straight line on the checkerboard from the camera view will therefore be affected
     h, w = this_image.shape[:2]
     new_camera_k, _ = cv2.getOptimalNewCameraMatrix(camera_k, camera_dist, (w,h), 1, (w,h))
     new_camera_dist = np.zeros((1, 5)) # the distortion coefficients will be zeroes after undistortion
     undistorted_image = cv2.undistort(this_image, camera_k, camera_dist, None, new_camera_k)
-    # Now we actually extract the checkerboard 
+    # Now we actually extract the checkerboard using the undistorted image and camera parameters
     gray = cv2.cvtColor(undistorted_image, cv2.COLOR_RGB2GRAY)
     ret, corners = cv2.findChessboardCorners(gray, (checkerboard_height, checkerboard_width), None)
     if ret == True:
       corners2 = cv2.cornerSubPix(gray, corners, (5,5), (-1,-1), criteria)
-      # Find the rotation and translation vectors between the board and the camera.
+      # Find the rotation and translation vectors (pose) between the board and the camera.
       ret_pnp, rvecs, tvecs = cv2.solvePnP(checkerboard_points, corners2, new_camera_k, new_camera_dist)
       # draw checkerboard corners for introspection
       cv2.drawChessboardCorners(undistorted_image, (checkerboard_width, checkerboard_height), corners2, ret)
@@ -127,16 +132,22 @@ def main():
       # # Visualisation - OpenCV
       # cv2.imshow('Image with checkerboard axis', undistorted_image) # Note the direction of the z axis
       # cv2.waitKey(500)
+
       # Visualisation - Interactive and extract horizontal line
+      # This is where a horizontal line is actually estimated based on the checkerboard pose
       visualise_camera_interface = ImageVisInterface(rvecs, tvecs, undistorted_image, camera_points)
       confirmed, camera_points = visualise_camera_interface.run()
       if confirmed == False:
-        Print("Something wrong with this image?")
+        print("Something wrong with this image?")
         return
       # else:
       #   print(camera_points) # For introspection only
+    else: 
+      print("Unable to extract a checkerboard - are you using the correct checkerboard parameters?")
+      return
 
     # Extract the line that correspond to the checkerboard from the LiDAR scan
+    # Using an interactive interface
     this_laser_points = np.asarray(this_laser.points)
     select_points_interface = SelectPointsInterface(this_laser_points, laser_points)
     laser_points = select_points_interface.run()
@@ -163,8 +174,20 @@ def main():
   plt.show(block=False)
   plt.pause(0.01)
 
+  # Alignment using ICP
+  # ICP will compute a pair of rotation and translation to align two point clouds
+  # Though the point-to-point distance model in the most common ICP methods assumes point-to-point correspondence
+  # in practice it is not always necessary - if you have a sufficient density. 
+
+  # Here, we are aligning 2 point clouds of mostly line structures
+  # However, these lines don't necessarily have the same length - 
+  # LiDAR lines measure the wall from one edge to another
+  # Camera lines are estimated based on checkerboard pose, with no knowledge on the dimension of the wall. 
+  # We are therefore only able to align the orientations of these line structure and the distances to them
+  # Therefore we need at least 2 pairs of camera/LIDAR lines for the alignment process
+
   # ICP using Open3D
-  # Put into 3D first because of the built-in 3D ICP in Open3D
+  # Put into 3D first because of the built-in ICP in Open3D is for 3D point cloud
   zeroes = np.ones((all_lidar_points.shape[0], 1))
   lidar_points_3d = np.hstack((all_lidar_points, zeroes))
   zeroes = np.ones((all_camera_points.shape[0], 1))
@@ -190,11 +213,11 @@ def main():
   print(icp_result)
 
   # 2D ICP using a custom function
-  # We provide 2 2D ICP options
+  # We provide 2 2D ICP options in this separate icp_2d.py file
   # Option 1 icp_2d.icp(): combine all points together and run ICP on all of them
   # Option 2 icp_2d.icp_per_line(): the point-to-point matching are conducted per line, instead of combined
   # The benefit of using option 2 is that there will be no confused correspondences across lines, 
-  # as these inter-line correspondences should not be physically possible
+  # as these inter-line correspondences should not be physically present
   transformation_history, points = icp_2d.icp_per_line(camera_points, laser_points, 200, 0.1, 1e-7, 1e-7, 50, False)
   # Compound the transformations because of the output (transformation_history) is for each iteration
   tf_total = np.eye(3)

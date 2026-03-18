@@ -158,16 +158,53 @@ def main():
   plt.show(block=False)
   plt.pause(0.01)
 
-  # If satisfied, run 2D ICP
-  transformation_history, points = icp_2d.icp(camera_points, laser_points, 200, 0.05, 1e-7, 1e-7, 50, True)
+  # Initial transformation to help with the alignment
+  # This can be obtained from an initial measurement. 
+  initial_tf = np.identity(3)
+  initial_tf[0, 2] = -0.1
+  initial_tf[1, 2] = -0.01
+  ones = np.ones((laser_points.shape[0], 1))
+  lidar_points_h = np.hstack((laser_points, ones))
+  transformed_h = (initial_tf @ lidar_points_h.T).T
+  laser_points_initial_correction = transformed_h[:, :2]
+
+  # ICP using Open3D
+  # Put into 3D first because of the built-in 3D ICP in Open3D
+  zeroes = np.ones((laser_points_initial_correction.shape[0], 1))
+  lidar_points_3d = np.hstack((laser_points_initial_correction, zeroes))
+  zeroes = np.ones((camera_points.shape[0], 1))
+  camera_points_3d = np.hstack((camera_points, zeroes))
+  lidar_cloud = o3d.geometry.PointCloud()
+  lidar_cloud.points = o3d.utility.Vector3dVector(lidar_points_3d)
+  camera_cloud = o3d.geometry.PointCloud()
+  camera_cloud.points = o3d.utility.Vector3dVector(camera_points_3d)
+
+  # Define the type of registration:
+  type = o3d.pipelines.registration.TransformationEstimationPointToPoint(False)  # "False" means rigid transformation, scale = 1
+  # Define the number of iterations
+  iterations = o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration = 200)
+
+  result = o3d.pipelines.registration.registration_icp(lidar_cloud, camera_cloud, 0.1, np.identity(4), type, iterations)
+  # print(result.transformation)
+  icp_result = np.array([
+      [result.transformation[0,0], result.transformation[0,1], result.transformation[0,3]],
+      [result.transformation[1,0], result.transformation[1,1], result.transformation[1,3]],
+      [0,         0,         1]
+    ])
+  icp_result = icp_result @ initial_tf
+  print("\n\nThe final results of 2D ICP using Open3D") 
+  print(icp_result)
+
+  # 2D ICP using a custom function
+  transformation_history, points = icp_2d.icp(camera_points, laser_points_initial_correction, 200, 0.1, 1e-7, 1e-7, 50, False)
+  # Compound the transformations because of the output
   tf_total = np.eye(3)
   for tf in transformation_history: 
     tf_homogeneous = np.eye(3)
     tf_homogeneous[:2, :] = tf
     tf_total = tf_total @ tf_homogeneous
-
-  # The final output
-  print("\n\nThe final results of 2D ICP") 
+  tf_total = tf_total @ initial_tf
+  print("\n\nThe final results of 2D ICP using custom function") 
   print(tf_total) 
 
   # Introspection - the end result of the alignment
@@ -179,14 +216,15 @@ def main():
   all_camera_points = camera_points.copy()
   all_camera_points_xy = np.array([[point[0],point[1]] for point in all_camera_points])
 
+  all_lidar_points = laser_points.copy()
   ones = np.ones((all_lidar_points.shape[0], 1))
   lidar_points_h = np.hstack((all_lidar_points, ones))
-  transformed_h = (tf_total @ lidar_points_h.T).T
+  transformed_h = (icp_result @ lidar_points_h.T).T
   transformed = transformed_h[:, :2]
 
   ax.scatter(all_camera_points_xy[:,0], all_camera_points_xy[:,1], c='green', label='All 2D Camera Points')
-  ax.scatter(points[:,0], points[:,1], c='blue', label='All 2D LiDAR Points, ICP produced')
-  ax.scatter(transformed[:,0], transformed[:,1], c='red', label='All 2D LiDAR Points, transformed')
+  ax.scatter(points[:,0], points[:,1], c='blue', label='All 2D LiDAR Points, custom function')
+  ax.scatter(transformed[:,0], transformed[:,1], c='red', label='All 2D LiDAR Points, Open3D')
 
   ax.legend()
   ax.set_xlabel('x')

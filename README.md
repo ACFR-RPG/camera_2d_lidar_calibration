@@ -2,6 +2,8 @@
 
 This is a camera and 2D LiDAR calibration library that computes the SE(3) transformation from the camera frame to the 2D LiDAR frame. 
 
+https://drive.google.com/drive/folders/1pZpSstLPTSJcQ-2KaaZFc8NeBMKuVD_V?usp=drive_link
+
 ## Assumptions and Environment Setup
 
 This calibration method relies on the following environment setup and assumptions:

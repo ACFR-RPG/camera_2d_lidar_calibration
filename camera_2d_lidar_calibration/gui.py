@@ -119,7 +119,7 @@ class SelectPointsInterface:
   def done_callback(self, event):
     if self.selected_points_indices:
       selected_pc2_points = self.laser_2d[self.selected_points_indices]
-      self.laser_points = np.vstack((self.laser_points, selected_pc2_points))
+      self.laser_points.append(selected_pc2_points)
       self.confirmed = True
       self.root.destroy()
 
@@ -235,7 +235,7 @@ class ImageVisInterface:
     line_base = np.linspace(0, line_length, int(line_length/line_spacing)+1)
     line_points = board_origin.T + np.outer(line_base, board_y_direction)
     line_points_2d = line_points[:, :2]
-    self.camera_points = np.vstack((self.camera_points, line_points_2d))
+    self.camera_points.append(line_points_2d)
 
     self.verified = True
     self.extracted = True

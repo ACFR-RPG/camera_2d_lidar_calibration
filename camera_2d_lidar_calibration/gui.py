@@ -19,6 +19,7 @@ from sklearn import linear_model
 
 
 class SelectPointsInterface:
+  # Class used to create an interactive GUI for selecting LIDAR points corresponding to the checkerboard
   def __init__(self, laser, laser_points):
     self.root = tk.Tk()
     self.root.title("Camera 2D LiDAR Calibration Menu - LiDAR 2D Point Selection")
@@ -26,14 +27,8 @@ class SelectPointsInterface:
     self.menubar = tk.Menu(self.root)        
     self.app = tk.Frame(self.root)
 
-    # Data storage
-    self.laser = laser.copy()
-    self.laser_2d = None
-    self.laser_points = laser_points.copy()
-    self.confirmed = False
-    
-    window_text = tk.Label(self.root,
-                                        text=f"Select 2D LiDAR points corresponding to the perpendicular surface of the checkerboard\nby using the Zoom feature followed by clicking 'Select Points'.\nOnce finished, click 'Done'.")
+    # GUI
+    window_text = tk.Label(self.root, text=f"Select 2D LiDAR points corresponding to the perpendicular surface of the checkerboard\nby using the Zoom feature followed by clicking 'Select Points'.\nOnce finished, click 'Done'.")
     window_text.pack(padx=5, pady=5)
     
     self.button_frame = ttk.Frame(self.root)    
@@ -47,6 +42,12 @@ class SelectPointsInterface:
     self.done_button.pack(side="left", padx=25,pady=(0,10), ipadx=20, ipady=20)
     self.done_button.bind("<ButtonPress>", self.done_callback)
 
+    # Data storage
+    self.laser = laser.copy()
+    self.laser_2d = None
+    self.laser_points = laser_points.copy()
+    self.confirmed = False
+    
     self.ax_lidar_points = None
     self.ax_selected_lidar_points = None
     self.selected_points_indices = None
@@ -118,6 +119,7 @@ class SelectPointsInterface:
 
   def done_callback(self, event):
     if self.selected_points_indices:
+      # Extract the selected points and insert them into the output list
       selected_pc2_points = self.laser_2d[self.selected_points_indices]
       self.laser_points.append(selected_pc2_points)
       self.confirmed = True
@@ -130,6 +132,7 @@ class SelectPointsInterface:
     
 class ImageVisInterface:
   # Class for an interface to visualise images and checkerboard
+  # Also where we estimate the line in the camera frame corresponding to the checkerboard using its pose
   def __init__(self, rotation_rod, translation, camera_image, camera_points):
     # GUI
     self.root = tk.Tk()
@@ -160,6 +163,7 @@ class ImageVisInterface:
 
     self.add_figure()
 
+    # Flags used to say that the checkerboard detection is not good enough
     self.verified = False
     self.extracted = False
 
@@ -174,17 +178,6 @@ class ImageVisInterface:
     self.navigation_tool_bar = tkagg.NavigationToolbar2Tk(self.chart_type, self.root)
     self.navigation_tool_bar.zoom()
     self.chart_type.get_tk_widget().pack()
-    # self.ax.set_title('Detected Vertical Lines')
-    # self.ax.callbacks.connect('xlim_changed', self.on_xlims_change)
-    # self.ax.callbacks.connect('ylim_changed', self.on_ylims_change)
-
-  def add_detected_lines(self, img) -> None:
-    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) # changes image encoding from RGB to BGR for cv2.imwrite to work correctly
-    self.ax.imshow(img)
-
-    for line in self.vertical_lines:
-      self.ax.plot((line[0,0], line[1,0]), (line[0,1], line[1,1]),c='blue', linewidth=2.0)
-      
 
   def on_xlims_change(self, event_ax) -> None:
     self.xlims = event_ax.get_xlim()
@@ -235,6 +228,7 @@ class ImageVisInterface:
     line_base = np.linspace(0, line_length, int(line_length/line_spacing)+1)
     line_points = board_origin.T + np.outer(line_base, board_y_direction)
     line_points_2d = line_points[:, :2]
+    # Write this line to an output list
     self.camera_points.append(line_points_2d)
 
     self.verified = True

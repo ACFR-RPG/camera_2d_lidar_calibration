@@ -51,7 +51,7 @@ def main():
             # Search in the grayscale image for the corners, refined sub pixel coorindates
             corners2 = cv2.cornerSubPix(gray, corners, (5, 5), (-1,-1), criteria)
             imgpoints.append(corners2)
-            # Draw and display the corners
+            # Draw and display the corners for introspection - do the corners/vertices drawn back onto the image match with the checkerboard in the camera view?
             cv2.drawChessboardCorners(img, (checkerboard_height, checkerboard_width), corners2, ret)
             cv2.imshow('img', img)
             cv2.waitKey(500)

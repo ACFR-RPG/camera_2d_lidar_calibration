@@ -139,7 +139,7 @@ class ImageVisInterface:
     self.app = tk.Frame(self.root)
 
     window_text = tk.Label(self.root,
-                        text=f"Verify whether this extracted checkerboard is reasonable.\nOnce verified, click 'Done' to extract a horizonal line in 3D.")
+                        text=f"Verify whether this extracted checkerboard is reasonable.\nLook for alignment between extracted corners and the checkerboard, as well as the pose of the board axis.\nOnce verified, click 'Done' to extract a horizonal line in 3D.")
     window_text.pack(padx=5, pady=5)
 
     self.button_frame = ttk.Frame(self.root)    

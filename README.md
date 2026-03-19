@@ -125,12 +125,12 @@ We further provide an initial transformation to assist ICP, if needed.
 The transformation can be edited [here](https://github.com/ACFR-RPG/camera_2d_lidar_calibration/blob/yw-vis-cleanup/camera_2d_lidar_calibration/cam_lidar_2d_icp.py#L180). 
 This is not mandatory. You are welcome to keep the `initial_tf` as identity if your ICP result is good. 
 
-<!-- e## Interactive Interfac
+e## Interactive Interfac
 
 After running, an interface will appear with instructions on selecting 2D LiDAR points that represent the wall containing the checkerboard pattern. Note that the interface appears for one ROS bag at a time, and all 2D points of the LiDAR for each bag are accumulated for each interface. To select the points, first change the sliders that control the starting and ending indices of scans from the ROS bag to desired values. Then, use `matplotlib`'s zoom feature, enabled by default, to zoom into a particular region and click `Select Points`. Once finished, click `Done` and repeat this for the other ROS bags. To see this process, watch the video below.
 
 <div align="center">
-  <video src="https://github.com/user-attachments/assets/df4e08ce-69d7-43a9-893b-6d8d50af472e" width="400"></video>
+  <video src="readme_pictures/2026_mtrx5700_assignment2_cameralidarcalibration.mp4" width="400"></video>
 </div>
 
 
@@ -168,7 +168,7 @@ As a sanity check, a set of test points from the camera frame are projected into
 
 The resulting calibration is saved in `~/ros2_ws/src/camera_2d_lidar_calibration/results/camera_2d_lidar_calibration_result_{timestamp}/camera_2d_lidar_calibration_transformation_result_{timestamp}.txt`, alongside any relevant data. 
 
-Evidently, the transformed points are close albeit can differ from any individual ROS bag. Recording more ROS bags and selecting the LiDAR points more carefully will improve the accuracy. -->
+Evidently, the transformed points are close albeit can differ from any individual ROS bag. Recording more ROS bags and selecting the LiDAR points more carefully will improve the accuracy.
 
 <!-- ## How It Works -->
 

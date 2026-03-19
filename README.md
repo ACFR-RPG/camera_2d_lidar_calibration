@@ -121,50 +121,30 @@ You will need to run the image and point cloud extraction script for each bag in
 Within the [`cam_lidar_2d_icp.py`](https://github.com/ACFR-RPG/camera_2d_lidar_calibration/blob/main/camera_2d_lidar_calibration/cam_lidar_2d_icp.py) script, you are expected to update the properties of the checkerboard you use in your calibration process [here](https://github.com/ACFR-RPG/camera_2d_lidar_calibration/blob/main/camera_2d_lidar_calibration/cam_lidar_2d_icp.py#L92), i.e. use the width and height of checkerboard vertices and size of the blocks that matches with the actual board, 
 as well as use the correct camera intrinsic by adjusting the parameters [here](https://github.com/ACFR-RPG/camera_2d_lidar_calibration/blob/main/camera_2d_lidar_calibration/cam_lidar_2d_icp.py#L84). 
 
-<!-- e## Interactive Interfac
+We further provide an initial transformation to assist ICP, if needed. 
+The transformation can be edited [here](https://github.com/ACFR-RPG/camera_2d_lidar_calibration/blob/yw-vis-cleanup/camera_2d_lidar_calibration/cam_lidar_2d_icp.py#L180). 
+This is not mandatory. You are welcome to keep the `initial_tf` as identity if your ICP result is good. 
 
-After running, an interface will appear with instructions on selecting 2D LiDAR points that represent the wall containing the checkerboard pattern. Note that the interface appears for one ROS bag at a time, and all 2D points of the LiDAR for each bag are accumulated for each interface. To select the points, first change the sliders that control the starting and ending indices of scans from the ROS bag to desired values. Then, use `matplotlib`'s zoom feature, enabled by default, to zoom into a particular region and click `Select Points`. Once finished, click `Done` and repeat this for the other ROS bags. To see this process, watch the video below.
+## Interactive Interface
 
-<div align="center">
-  <video src="https://github.com/user-attachments/assets/df4e08ce-69d7-43a9-893b-6d8d50af472e" width="400"></video>
-</div>
+https://github.com/user-attachments/assets/2e9a6040-e655-42e4-a3b3-8bb522ecd626
 
+The video above shows what you should expect to see once you are running the script. 
+This example uses the images and point clouds in the `/example` folder. 
+The script will read in images and point clouds and first try to extract a checkerboard from the image. 
+If it can successfully extract the checkerboard, it will launch an interface, asking you to confirm that it is a good checkerboard. 
+You are recommended to zoom in and check whether the vertices of the checkerboard are correctly detected. 
+If not, you may want to check whether your checkerboard corner detection/searching [line](https://github.com/ACFR-RPG/camera_2d_lidar_calibration/blob/yw-vis-cleanup/camera_2d_lidar_calibration/cam_lidar_2d_icp.py#L123) is implemented correctly. 
+If it is wrong, clicking the `This looks wrong!` button will terminate the interface. 
 
+If the checkerboard is correctly detected, clicking `Done` will notify the script to extract and estimate a line in 3D space that correspond to the y axis of the checkerboard pose. 
+Then, it will launch an interface asking you to select the matching point cloud. 
+You should use the Zoom function again to only include the points corresponding to the wall in the interface, and click `Select Points` to highlight them. Then you can click `Done` to record them into the system. 
 
-<p align="center">
-<img src="readme_pictures/lidar_2d_selection_menu.png" height="400">
-<img src="readme_pictures/lidar_2d_selection.png" height="400">
-</p>
-
-<p align="center">
-<img src="readme_pictures/lidar_2d_selection_red.png" height="400">
-<img src="readme_pictures/lidar_2d_selection_zoom_out.png" height="400">
-</p>
-
-After selecting the 2D  scans, another interface will appear to match the 2D LiDAR points with the camera frame for each ROS bag. This interface will contain the relevant instructions on selecting vertical lines that correspond to the edges of the wall, and works similarly to the previous interface. In the current implementation, at least one endpoint of each vertical line must be in the zoomed window to be selected.
-
-<p align="center">
-<img src="readme_pictures/wall_edge_menu.png" height="400">
-<img src="readme_pictures/wall_edge_selection.png" height="400">
-</p>
-
-After following these instructions, plots will appear for each bag that represent the fitted lines corresponding to the wall.
-
-<p align="center">
-<img src="readme_pictures/lidar_detected_wall.png" height="400">
-<img src="readme_pictures/camera_detected_wall.png" height="400">
-</p>
-
-As a sanity check, a set of test points from the camera frame are projected into the LiDAR frame.
-
-<p align="center">
-<img src="readme_pictures/test_points.png" height="400">
-<img src="readme_pictures/transformed_points.png" height="400">
-</p>
-
-The resulting calibration is saved in `~/ros2_ws/src/camera_2d_lidar_calibration/results/camera_2d_lidar_calibration_result_{timestamp}/camera_2d_lidar_calibration_transformation_result_{timestamp}.txt`, alongside any relevant data. 
-
-Evidently, the transformed points are close albeit can differ from any individual ROS bag. Recording more ROS bags and selecting the LiDAR points more carefully will improve the accuracy. -->
+Repeat this process for all pairs of images and LiDAR scans. 
+At the end, the script will provide visualisation for introspection and qualititative evaluation. 
+First, we will visualise the points/lines that represent the checkerboard poses in both camera view (estimated) and LiDAR scan (selected). 
+Then, we will visualise the 2D ICP results by aligning the point clouds using computed transformations from two different ICP algorithms. 
 
 <!-- ## How It Works -->
 

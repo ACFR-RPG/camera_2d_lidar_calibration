@@ -82,17 +82,17 @@ def main():
 
   # Camera intrinsics, from camera calibration process
   # TODO: Change this into the camera intrinsic calibration results
-  camera_k = np.array([(519.26845842, 0.0, 331.11197675), (0.0, 518.89359517, 229.43433605), (0.0, 0.0, 1.0)])
-  camera_dist = np.array([(0.11418155, 0.19343114, -0.00268067, 0.00371577, -1.09539701)])
+  camera_k = np.array([(505.29124569, 0.0, 322.19927863), (0.0, 504.55350189, 236.33609581), (0.0, 0.0, 1.0)])
+  camera_dist = np.array([(0.18421732, -0.31277364, -0.00041421, 0.00039006, -0.07993784)])
 
   # termination criteria, for aligning checkerboard corners onto an image
   criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
   # Checkerboard shape, example: 7*10 in checkerboard blocks, 20 mm in checkerboard block size
   # TODO: Change the checkerboard parameters into those that match with the actual board you are using
-  checkerboard_height = 7
-  checkerboard_width = 10 
-  checkerboard_size = 0.02
+  checkerboard_height = 8
+  checkerboard_width = 11 
+  checkerboard_size = 0.019
   checkerboard_points = np.zeros((checkerboard_width*checkerboard_height, 3), np.float32)
   checkerboard_points[:,:2] = np.mgrid[0:checkerboard_height,0:checkerboard_width].T.reshape(-1,2)*checkerboard_size
 

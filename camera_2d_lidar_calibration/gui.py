@@ -123,7 +123,7 @@ class SelectPointsInterface:
       selected_pc2_points = self.laser_2d[self.selected_points_indices]
       self.laser_points.append(selected_pc2_points)
       self.confirmed = True
-      self.root.destroy()
+      self.root.after(0, self.root.destroy)
 
   def run(self) -> np.ndarray:
     self.app.mainloop()
@@ -229,12 +229,12 @@ class ImageVisInterface:
 
     self.verified = True
     self.extracted = True
-    self.root.destroy()
+    self.root.after(0, self.root.destroy)
 
   def cancel_callback(self, event) -> None:
     self.verified = True
     self.extracted = False
-    self.root.destroy()
+    self.root.after(0, self.root.destroy)
 
 
   def run(self) -> tuple[bool, np.ndarray]:

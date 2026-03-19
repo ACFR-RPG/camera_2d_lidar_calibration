@@ -196,14 +196,6 @@ class ImageVisInterface:
     tf_cam_to_robot[0:3, 0:3] = rot_cam_to_robot
     # print(tf_cam_to_robot)
 
-    # Put the OpenCV board reference frame into something sensible (robotic convention)
-    # As shown in the visualisation, it is a -90 degree rotation along y axis
-    rot_rod_robot_board_to_board = np.array([[0], [-np.pi/2], [0]]) # rotation around y axis for -90 degrees, in Rodrigues form
-    rot_robot_board_to_board, _ = cv2.Rodrigues(rot_rod_robot_board_to_board)
-    tf_robot_board_to_board = np.eye(4)
-    tf_robot_board_to_board[0:3, 0:3] = rot_robot_board_to_board
-    # print(tf_robot_board_to_board)
-
     # Compute the tf from the checkerboard to camera - used to transform a point in checkerboard frame to camera frame
     # Also known as the pose of the checkerboard in camera frame
     rotation, _ = cv2.Rodrigues(self.rotation_rod)
@@ -215,17 +207,21 @@ class ImageVisInterface:
     # The tf from the board frame in robotic convention, to the robot frame (camera frame) in robotic convention
     # The pose of the board frame in robotic convention, in the robot frame (camera frame), in robotic convention
     # Used to transform a point in board frame into camera frame
-    tf_robot_board_to_robot = tf_cam_to_robot @ (tf_board_to_cam @ tf_robot_board_to_board)
+    tf_robot_board_to_robot = tf_cam_to_robot @ tf_board_to_cam
     # print(tf_robot_board_to_robot)
 
-    # Let's extract/compute a line that goes from the board's origin along the positive direction of the y axis for 30 cm
+    # Let's extract/compute a line that goes from the board's origin
+    # along the positive direction of the y axis for 30 cm, and negative for 10 cm
     # spacing 0.5 cm
-    line_length = 0.3
+    # This might differ with your board layout, but because we are doing line fitting, so wall length is agnostic
+    # It will help with ICP though - more points to fit
+    line_end = 0.3
+    line_start = -0.1
     line_spacing = 0.005
     board_origin = (tf_robot_board_to_robot @ (np.array([0,0,0,1]).reshape(4,1)))[:3,:]
     board_y_direction = (tf_robot_board_to_robot @ (np.array([0,1,0,1]).reshape(4,1)))[:3,:] - board_origin
     board_y_direction = board_y_direction / la.norm(board_y_direction) # normalise the direction just in case - it should be a unit vector to behind with
-    line_base = np.linspace(0, line_length, int(line_length/line_spacing)+1)
+    line_base = np.linspace(line_start, line_end, int((line_end - line_start)/line_spacing)+1)
     line_points = board_origin.T + np.outer(line_base, board_y_direction)
     line_points_2d = line_points[:, :2]
     # Write this line to an output list

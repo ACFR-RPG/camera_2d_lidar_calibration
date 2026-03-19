@@ -120,7 +120,7 @@ def main():
     gray = cv2.cvtColor(undistorted_image, cv2.COLOR_RGB2GRAY)
     ret, corners = cv2.findChessboardCorners(gray, (checkerboard_height, checkerboard_width), None)
     if ret == True:
-      corners2 = cv2.cornerSubPix(gray, corners, (5,5), (-1,-1), criteria)
+      corners2 = cv2.cornerSubPix(gray, corners, (3,3), (-1,-1), criteria)
       # Find the rotation and translation vectors (pose) between the board and the camera.
       ret_pnp, rvecs, tvecs = cv2.solvePnP(checkerboard_points, corners2, new_camera_k, new_camera_dist)
       # draw checkerboard corners for introspection
@@ -174,6 +174,22 @@ def main():
   plt.show(block=False)
   plt.pause(0.01)
 
+  # Initial transformation to help with the alignment
+  # This can be obtained from an initial measurement. 
+  # A good ICP system should not need this initialisation, but sometimes it helps. 
+  # TODO: If you need to, you may put your own desired/measured transformation into the initial_tf 
+  initial_tf = np.identity(3)
+  # initial_tf[0, 2] = -0.1
+  laser_points_initial_correction = []
+  for this_laser_line in laser_points: 
+      ones = np.ones((this_laser_line.shape[0], 1))
+      lidar_points_h = np.hstack((this_laser_line, ones))
+      transformed_h = (initial_tf @ lidar_points_h.T).T
+      laser_points_initial_correction.append(transformed_h[:, :2])
+
+  # Concatenate the list of arrays into long arrays
+  all_lidar_points_initial_corrected = np.vstack(laser_points_initial_correction)
+
   # Alignment using ICP
   # ICP will compute a pair of rotation and translation to align two point clouds
   # Though the point-to-point distance model in the most common ICP methods assumes point-to-point correspondence
@@ -188,8 +204,8 @@ def main():
 
   # ICP using Open3D
   # Put into 3D first because of the built-in ICP in Open3D is for 3D point cloud
-  zeroes = np.ones((all_lidar_points.shape[0], 1))
-  lidar_points_3d = np.hstack((all_lidar_points, zeroes))
+  zeroes = np.ones((all_lidar_points_initial_corrected.shape[0], 1))
+  lidar_points_3d = np.hstack((all_lidar_points_initial_corrected, zeroes))
   zeroes = np.ones((all_camera_points.shape[0], 1))
   camera_points_3d = np.hstack((all_camera_points, zeroes))
   lidar_cloud = o3d.geometry.PointCloud()
@@ -200,7 +216,7 @@ def main():
   # Define the type of registration:
   type = o3d.pipelines.registration.TransformationEstimationPointToPoint(False)  # "False" means rigid transformation, scale = 1
   # Define the number of iterations
-  iterations = o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration = 200)
+  iterations = o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration = 300)
 
   result = o3d.pipelines.registration.registration_icp(lidar_cloud, camera_cloud, 0.1, np.identity(4), type, iterations)
   # print(result.transformation)
@@ -209,6 +225,7 @@ def main():
       [result.transformation[1,0], result.transformation[1,1], result.transformation[1,3]],
       [0,         0,         1]
     ])
+  icp_result = icp_result @ initial_tf
   print("\n\nThe final results of 2D ICP using Open3D") 
   print(icp_result)
 
@@ -218,13 +235,14 @@ def main():
   # Option 2 icp_2d.icp_per_line(): the point-to-point matching are conducted per line, instead of combined
   # The benefit of using option 2 is that there will be no confused correspondences across lines, 
   # as these inter-line correspondences should not be physically present
-  transformation_history, points = icp_2d.icp_per_line(camera_points, laser_points, 200, 0.1, 1e-7, 1e-7, 50, False)
+  transformation_history, points = icp_2d.icp_per_line(camera_points, laser_points_initial_correction, 300, 0.1, 1e-7, 1e-7, 50, False)
   # Compound the transformations because of the output (transformation_history) is for each iteration
   tf_total = np.eye(3)
   for tf in transformation_history: 
     tf_homogeneous = np.eye(3)
     tf_homogeneous[:2, :] = tf
     tf_total = tf_total @ tf_homogeneous
+  tf_total = tf_total @ initial_tf
   print("\n\nThe final results of 2D ICP using custom function") 
   print(tf_total) 
 

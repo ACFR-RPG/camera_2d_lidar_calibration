@@ -125,13 +125,13 @@ We further provide an initial transformation to assist ICP, if needed.
 The transformation can be edited [here](https://github.com/ACFR-RPG/camera_2d_lidar_calibration/blob/yw-vis-cleanup/camera_2d_lidar_calibration/cam_lidar_2d_icp.py#L180). 
 This is not mandatory. You are welcome to keep the `initial_tf` as identity if your ICP result is good. 
 
-e## Interactive Interfac
+## Interactive Interfac
 
 After running, an interface will appear with instructions on selecting 2D LiDAR points that represent the wall containing the checkerboard pattern. Note that the interface appears for one ROS bag at a time, and all 2D points of the LiDAR for each bag are accumulated for each interface. To select the points, first change the sliders that control the starting and ending indices of scans from the ROS bag to desired values. Then, use `matplotlib`'s zoom feature, enabled by default, to zoom into a particular region and click `Select Points`. Once finished, click `Done` and repeat this for the other ROS bags. To see this process, watch the video below.
 
-<div align="center">
-  <video src="readme_pictures/2026_mtrx5700_assignment2_cameralidarcalibration.mp4" width="400"></video>
-</div>
+
+
+https://github.com/user-attachments/assets/2e9a6040-e655-42e4-a3b3-8bb522ecd626
 
 
 

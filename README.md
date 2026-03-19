@@ -121,7 +121,7 @@ You will need to run the image and point cloud extraction script for each bag in
 Within the [`cam_lidar_2d_icp.py`](https://github.com/ACFR-RPG/camera_2d_lidar_calibration/blob/main/camera_2d_lidar_calibration/cam_lidar_2d_icp.py) script, you are expected to update the properties of the checkerboard you use in your calibration process [here](https://github.com/ACFR-RPG/camera_2d_lidar_calibration/blob/main/camera_2d_lidar_calibration/cam_lidar_2d_icp.py#L92), i.e. use the width and height of checkerboard vertices and size of the blocks that matches with the actual board, 
 as well as use the correct camera intrinsic by adjusting the parameters [here](https://github.com/ACFR-RPG/camera_2d_lidar_calibration/blob/main/camera_2d_lidar_calibration/cam_lidar_2d_icp.py#L84). 
 
-## Interactive Interfac<!-- e
+<!-- e## Interactive Interfac
 
 After running, an interface will appear with instructions on selecting 2D LiDAR points that represent the wall containing the checkerboard pattern. Note that the interface appears for one ROS bag at a time, and all 2D points of the LiDAR for each bag are accumulated for each interface. To select the points, first change the sliders that control the starting and ending indices of scans from the ROS bag to desired values. Then, use `matplotlib`'s zoom feature, enabled by default, to zoom into a particular region and click `Select Points`. Once finished, click `Done` and repeat this for the other ROS bags. To see this process, watch the video below.
 

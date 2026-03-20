@@ -31,7 +31,7 @@ def main():
     # TODO: Update the checkerboard parameters based on your own printed out board
     checkerboard_width = 11
     checkerboard_height = 8
-    checkerboard_size = 0.19
+    checkerboard_size = 0.019
     objp = np.zeros((checkerboard_width*checkerboard_height, 3), np.float32)
     objp[:,:2] = np.mgrid[0:checkerboard_height, 0:checkerboard_width].T.reshape(-1,2)*checkerboard_size
 
